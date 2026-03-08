@@ -1,7 +1,10 @@
+// src/components/SongListClient.tsx
 "use client";
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+// Importamos el hook de la playlist
+import { usePlaylist } from '@/src/context/PlaylistContext';
 
 interface Song {
   id: string;
@@ -12,44 +15,53 @@ export default function SongListClient({ initialSongs }: { initialSongs: Song[] 
   const [songs, setSongs] = useState(initialSongs);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
+  
+  // Usamos el contexto de la Playlist
+  const { addToPlaylist, removeFromPlaylist, isInPlaylist } = usePlaylist();
 
   useEffect(() => {
-  console.log("Termino de búsqueda actual:", searchTerm); // <--- RASTREO 1
-
-  if (searchTerm.trim() === "") {
-    setSongs(initialSongs);
-    return;
-  }
-
-  const delayDebounceFn = setTimeout(async () => {
-    setLoading(true);
-    try {
-      console.log("Llamando a la API con:", searchTerm); // <--- RASTREO 2
-      const res = await fetch(`/api/songs/search?q=${encodeURIComponent(searchTerm)}`);
-      const data = await res.json();
-      
-      console.log("Datos recibidos de la API:", data); // <--- RASTREO 3
-      
-      if (!data.error) {
-        setSongs(data);
-      }
-    } catch (error) {
-      console.error("Error en el fetch:", error);
-    } finally {
-      setLoading(false);
+    // Si no hay término, mostramos la lista inicial
+    if (searchTerm.trim() === "") {
+      setSongs(initialSongs);
+      return;
     }
-  }, 500);
 
-  return () => clearTimeout(delayDebounceFn);
-}, [searchTerm, initialSongs]);
+    // Debounce: Esperamos 800ms antes de llamar a la API
+    const delayDebounceFn = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/songs/search?q=${encodeURIComponent(searchTerm)}`);
+        const data = await res.json();
+        
+        // Verificamos que data sea un array antes de setearlo
+        if (Array.isArray(data)) {
+          setSongs(data);
+        } else {
+          setSongs([]); // Si hay error, limpiamos la lista
+        }
+      } catch (error) {
+        console.error("Error buscando canciones:", error);
+        setSongs([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 800);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm, initialSongs]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      
+      {/* SECCIÓN ELIMINADA: LISTA DE HOY (PLAYLIST SUPERIOR) 
+         Ahora solo se gestiona desde el FloatingPlaylist global.
+      */}
+
       {/* BUSCADOR */}
       <div className="relative">
         <input
           type="text"
-          placeholder="Buscar por título o letra (ej. 'Cristo nos llama')..."
+          placeholder="Buscar título o letra..."
           className="w-full p-4 pl-12 bg-white shadow-sm border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all text-gray-700"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -65,32 +77,63 @@ export default function SongListClient({ initialSongs }: { initialSongs: Song[] 
         </div>
       </div>
 
-      {/* LISTA DE CANCIONES */}
+      {/* LISTA DE CANCIONES DISPONIBLES */}
       <div className="grid gap-3">
         {songs.length > 0 ? (
           songs.map((song) => (
-            <Link 
-              key={song.id} 
-              href={`/song/${song.id}`}
-              className="group flex items-center justify-between p-5 bg-white hover:bg-blue-50 border border-gray-100 rounded-xl shadow-sm transition-all hover:shadow-md"
-            >
-              <div className="flex items-center gap-4">
-                <div className="bg-blue-100 text-blue-600 p-3 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6V9a5 5 0 11-2 0V5.414l1.293 1.293a1 1 0 001.414-1.414L16.414 3H18z" />
-                  </svg>
+            <div key={song.id} className="relative flex items-center group">
+              {/* LINK PRINCIPAL (Área de clic más grande) */}
+              <Link 
+                href={`/song/${song.id}`}
+                className="flex-1 flex items-center justify-between p-3 bg-white hover:bg-blue-50 border border-gray-100 rounded-xl shadow-sm transition-all hover:shadow-md"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="bg-blue-100 text-blue-600 p-3 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                    <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6V9a5 5 0 11-2 0V5.414l1.293 1.293a1 1 0 001.414-1.414L16.414 3H18z" />
+                    </svg>
+                  </div>
+                  {/* truncate evita que nombres largos rompan el diseño */}
+                  <span className="text-sm font-bold text-gray-700 group-hover:text-blue-700 truncate max-w-[200px] md:max-w-md">
+                    {song.name.replace(/\.[^/.]+$/, "")}
+                  </span>
                 </div>
-                <span className="text-lg font-bold text-gray-700 group-hover:text-blue-700">
-                  {song.name.replace(/\.[^/.]+$/, "")}
-                </span>
-              </div>
-              <svg className="h-5 w-5 text-gray-300 group-hover:text-blue-500 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
+
+                <button
+                  onClick={(e) => {
+                    e.preventDefault(); // Por seguridad, aunque ya está fuera del Link
+                    if (isInPlaylist(song.id)) {
+                      removeFromPlaylist(song.id);
+                    } else {
+                      addToPlaylist(song); // Pasamos el objeto song completo
+                    }
+                  }}
+                  className={`ml-3 p-4 rounded-xl transition-all shadow-sm flex items-center justify-center ${
+                    isInPlaylist(song.id) 
+                    ? "bg-blue-600 text-white" 
+                    : "bg-white text-blue-600 border border-blue-100 hover:bg-blue-600 hover:text-white hover:shadow-lg"
+                  }`}
+                  title={isInPlaylist(song.id) ? "Quitar de la playlist" : "Añadir a playlist"}
+                >
+                  {isInPlaylist(song.id) ? (
+                    // Ícono de Check ✓
+                    <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  ) : (
+                    // Ícono de Más +
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                  )}
+                </button>
+              </Link>
+
+              {/* BOTÓN + / AGREGAR A PLAYLIST (Fuera del Link para no navegar) */}
+            </div>
           ))
         ) : (
-          <p className="text-center text-gray-400 py-10">No se encontraron canciones que coincidan...</p>
+          <p className="text-center text-gray-400 py-10 font-medium">No se encontraron canciones que coincidan...</p>
         )}
       </div>
     </div>
