@@ -54,23 +54,48 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
 
   // Carga automática de nombres
   useEffect(() => {
-    const fetchMissingNames = async () => {
-      const missing = playlist.filter(s => s.name === "Cargando...");
+    const fetchNames = async () => {
+      const missing = playlist.filter((s: Song) => s.name === "Cargando...");
       if (missing.length === 0) return;
-      const ids = missing.map(s => s.id).join(',');
+
+      const ids = missing.map((s: Song) => s.id).join(',');
+      
       try {
         const res = await fetch(`/api/songs/bulk?ids=${ids}`);
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setPlaylist(prev => prev.map(song => {
-            const found = data.find(d => d.id === song.id);
-            return found ? { ...song, name: found.name } : song;
-          }));
+        
+        // Verificamos si la respuesta es correcta antes de intentar leer el JSON
+        if (!res.ok) {
+            throw new Error(`Error en servidor: ${res.status}`);
         }
-      } catch (e) { console.error(e); }
+
+        const data = await res.json();
+
+        if (Array.isArray(data) && data.length > 0) {
+          setPlaylist((current: Song[]) => 
+            current.map((song: Song) => {
+              const found = data.find((d: any) => d.id === song.id);
+              // Solo actualizamos si encontramos el nombre real
+              if (found && song.name === "Cargando...") {
+                return { ...song, name: found.name };
+              }
+              return song;
+            })
+          );
+        }
+      } catch (err) {
+        console.error("Error al recuperar nombres de la lista:", err);
+        // Si falla, al menos intentamos que no diga "Cargando..." para siempre
+        // Opcional: setPlaylist(prev => prev.map(s => s.name === "Cargando..." ? {...s, name: "Canción importada"} : s))
+      }
     };
-    fetchMissingNames();
-  }, [playlist.length]);
+
+    // Un pequeño delay de 500ms para no saturar si hay muchos re-renders
+    const timer = setTimeout(() => {
+        fetchNames();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [playlist.length]); // IMPORTANTE: Solo observar el largo de la lista
 
   const addToPlaylist = (song: Song) => {
     setPlaylist(prev => prev.find(s => s.id === song.id) ? prev : [...prev, song]);
