@@ -21,8 +21,7 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "Mi Canxionero",
-  description: "Repertorio Digital para Músicos",
+  title: "Canxionero",
 };
 
 export default function RootLayout({
