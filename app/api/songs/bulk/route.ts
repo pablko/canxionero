@@ -5,17 +5,13 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const idsParam = searchParams.get('ids');
   
-  // Si no hay IDs, devolvemos array vacío pero con formato JSON
   if (!idsParam) return NextResponse.json([]);
 
   try {
     const ids = idsParam.split(',');
     const allSongs = await getSongsList();
     
-    // Si por alguna razón Google Drive devuelve vacío
-    if (!allSongs || allSongs.length === 0) {
-        return NextResponse.json([]);
-    }
+    if (!allSongs) return NextResponse.json([]);
 
     const filtered = allSongs
       .filter(s => s.id && ids.includes(s.id))
@@ -27,7 +23,7 @@ export async function GET(request: Request) {
     return NextResponse.json(filtered);
   } catch (error) {
     console.error("Error en API Bulk:", error);
-    // IMPORTANTE: Devolver un JSON aunque haya error para que res.json() no explote
+    // Devolvemos array vacío pero con status 500 para que el cliente sepa que falló
     return NextResponse.json([], { status: 500 });
   }
 }

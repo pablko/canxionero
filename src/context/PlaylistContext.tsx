@@ -1,5 +1,6 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 
 interface Song {
   id: string;
@@ -12,7 +13,7 @@ interface PlaylistContextType {
   addToPlaylist: (song: Song) => void;
   removeFromPlaylist: (id: string) => void;
   updateSongKey: (id: string, newKey: string) => void;
-  reorderPlaylist: (startIndex: number, endIndex: number) => void; // Nueva función
+  reorderPlaylist: (startIndex: number, endIndex: number) => void;
   isInPlaylist: (id: string) => boolean;
   clearPlaylist: () => void;
   isImporting: boolean;
@@ -24,9 +25,13 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
   const [playlist, setPlaylist] = useState<Song[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const isImportedRef = useRef(false);
+  const router = useRouter();
+  const pathname = usePathname();
 
+  // 1. Carga inicial e IMPORTACIÓN (Limpiando URL)
   useEffect(() => {
     if (isImportedRef.current) return;
+    
     const params = new URLSearchParams(window.location.search);
     const sharedList = params.get('list');
 
@@ -34,95 +39,113 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
       isImportedRef.current = true;
       setIsImporting(true);
       try {
-        const decoded = sharedList.split(',').map(item => {
-          const [id, key] = item.split(':');
-          return { id, key: (!key || key === 'orig') ? undefined : key, name: "Cargando..." };
-        }).filter(Boolean) as Song[];
+        const decoded = sharedList.split(',').map((item: string) => {
+          const parts = item.split(':');
+          return { 
+            id: parts[0], 
+            key: (!parts[1] || parts[1] === 'orig') ? undefined : parts[1], 
+            name: "Cargando..." 
+          };
+        }).filter((s: Song) => s.id);
         
         if (decoded.length > 0) {
           setPlaylist(decoded);
           localStorage.setItem('canxionero-playlist', JSON.stringify(decoded));
+          
+          // LIMPIEZA DE URL: Eliminamos el ?list=... de la barra de direcciones
+          // Esto evita que al recargar se vuelva a disparar la importación
+          router.replace(pathname);
         }
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, '', newUrl);
-      } catch (e) { console.error(e); } finally { setIsImporting(false); }
+      } catch (e) {
+        console.error("Error importando:", e);
+      } finally {
+        setIsImporting(false);
+      }
     } else {
+      // Si no hay lista en URL, cargamos lo que haya en LocalStorage
       const saved = localStorage.getItem('canxionero-playlist');
-      if (saved) setPlaylist(JSON.parse(saved));
+      if (saved) {
+        try {
+          setPlaylist(JSON.parse(saved));
+        } catch (e) {
+          console.error("Error localstorage", e);
+        }
+      }
     }
-  }, []);
+  }, [pathname, router]);
 
-  // Carga automática de nombres
+  // 2. Recuperar nombres reales de la API Bulk
   useEffect(() => {
     const fetchNames = async () => {
       const missing = playlist.filter((s: Song) => s.name === "Cargando...");
       if (missing.length === 0) return;
 
       const ids = missing.map((s: Song) => s.id).join(',');
-      
       try {
         const res = await fetch(`/api/songs/bulk?ids=${ids}`);
-        
-        // Verificamos si la respuesta es correcta antes de intentar leer el JSON
-        if (!res.ok) {
-            throw new Error(`Error en servidor: ${res.status}`);
-        }
-
+        if (!res.ok) throw new Error("Error en API");
         const data = await res.json();
 
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setPlaylist((current: Song[]) => 
             current.map((song: Song) => {
               const found = data.find((d: any) => d.id === song.id);
-              // Solo actualizamos si encontramos el nombre real
-              if (found && song.name === "Cargando...") {
-                return { ...song, name: found.name };
-              }
-              return song;
+              return (found && song.name === "Cargando...") ? { ...song, name: found.name } : song;
             })
           );
         }
       } catch (err) {
-        console.error("Error al recuperar nombres de la lista:", err);
-        // Si falla, al menos intentamos que no diga "Cargando..." para siempre
-        // Opcional: setPlaylist(prev => prev.map(s => s.name === "Cargando..." ? {...s, name: "Canción importada"} : s))
+        console.error("Error nombres:", err);
       }
     };
 
-    // Un pequeño delay de 500ms para no saturar si hay muchos re-renders
-    const timer = setTimeout(() => {
-        fetchNames();
-    }, 500);
-
+    const timer = setTimeout(fetchNames, 500);
     return () => clearTimeout(timer);
-  }, [playlist.length]); // IMPORTANTE: Solo observar el largo de la lista
+  }, [playlist.length]);
 
   const addToPlaylist = (song: Song) => {
-    setPlaylist(prev => prev.find(s => s.id === song.id) ? prev : [...prev, song]);
+    setPlaylist((prev: Song[]) => {
+      if (prev.find(s => s.id === song.id)) return prev;
+      const newList = [...prev, song];
+      localStorage.setItem('canxionero-playlist', JSON.stringify(newList));
+      return newList;
+    });
   };
 
-  const removeFromPlaylist = (id: string) => setPlaylist(prev => prev.filter(s => s.id !== id));
+  const removeFromPlaylist = (id: string) => {
+    setPlaylist((prev: Song[]) => {
+      const newList = prev.filter(s => s.id !== id);
+      localStorage.setItem('canxionero-playlist', JSON.stringify(newList));
+      return newList;
+    });
+  };
 
   const updateSongKey = (id: string, newKey: string) => {
-    setPlaylist(prev => {
+    setPlaylist((prev: Song[]) => {
       const newList = prev.map(s => s.id === id ? { ...s, key: newKey } : s);
       localStorage.setItem('canxionero-playlist', JSON.stringify(newList));
       return newList;
     });
   };
 
-  // Función para mover elementos en la lista
   const reorderPlaylist = (startIndex: number, endIndex: number) => {
-    setPlaylist(prev => {
+    setPlaylist((prev: Song[]) => {
       const result = Array.from(prev);
       const [removed] = result.splice(startIndex, 1);
       result.splice(endIndex, 0, removed);
+      localStorage.setItem('canxionero-playlist', JSON.stringify(result));
       return result;
     });
   };
 
-  const isInPlaylist = (id: string) => playlist.some(s => s.id === id);
-  const clearPlaylist = () => setPlaylist([]);
+  const isInPlaylist = (id: string) => playlist.some((s: Song) => s.id === id);
+
+  const clearPlaylist = () => {
+    localStorage.removeItem('canxionero-playlist');
+    setPlaylist([]);
+    // Forzamos navegación al index para limpiar cualquier rastro en la URL si lo hubiera
+    router.replace(pathname);
+  };
 
   return (
     <PlaylistContext.Provider value={{ 
