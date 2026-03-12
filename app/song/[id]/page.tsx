@@ -12,7 +12,7 @@ export default function SongPage() {
   const [currentKey, setCurrentKey] = useState<string>("C");
   const [loading, setLoading] = useState(true);
   const songRef = useRef<HTMLDivElement>(null);
-  
+
   // Referencia para evitar que el tono se resetee mientras se carga la playlist
   const hasAppliedInitialKey = useRef(false);
 
@@ -146,10 +146,10 @@ export default function SongPage() {
       </div>
 
       {/* Papel de la canción */}
-      <div className="bg-white p-4 sm:p-16 shadow-md sm:shadow-2xl rounded-sm w-full max-w-none sm:max-w-[21cm] mb-20 border border-gray-100 sm:border-none">
+      <div className="bg-white p-4 sm:p-16 shadow-md sm:shadow-2xl rounded-sm w-full max-w-none sm:max-w-[21cm] mb-20">
         <div 
           ref={songRef}
-          className="whitespace-pre-wrap text-[15px] sm:text-[17px] leading-[1.7] text-gray-900"
+          className="whitespace-pre text-[15px] sm:text-[17px] leading-[1.5] text-gray-900" // Cambiado leading-1.7 a 1.5
           style={{ fontFamily: 'var(--font-montserrat)' }}
           dangerouslySetInnerHTML={{ __html: songHtml }} 
         />
