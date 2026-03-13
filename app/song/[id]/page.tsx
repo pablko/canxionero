@@ -13,18 +13,23 @@ export default function SongPage() {
   const [loading, setLoading] = useState(true);
   const songRef = useRef<HTMLDivElement>(null);
 
-  // Referencia para evitar que el tono se resetee mientras se carga la playlist
   const hasAppliedInitialKey = useRef(false);
 
-  const { playlist, updateSongKey, isInPlaylist } = usePlaylist();
+  const { playlist, updateSongKey, isInPlaylist, addToPlaylist, removeFromPlaylist } = usePlaylist();
   const params = useParams();
   const songId = params?.id as string;
 
-  // 1. Cargar la canción y detectar tono original
+  // 1. SOLUCIÓN AL SCROLL: Obligamos a ir arriba cuando se carga el HTML
+  useEffect(() => {
+    if (songHtml) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
+  }, [songHtml]);
+
+  // 2. Cargar la canción y detectar tono
   useEffect(() => {
     async function loadSong() {
       if (!songId) return;
-      
       try {
         const res = await fetch(`/api/song/${songId}`);
         const data = await res.json();        
@@ -54,7 +59,6 @@ export default function SongPage() {
 
         setOriginalKey(detectedKey);
         
-        // Si no tenemos tono previo de la playlist, ponemos el detectado
         if (!hasAppliedInitialKey.current) {
           setCurrentKey(detectedKey);
         }
@@ -68,18 +72,24 @@ export default function SongPage() {
     loadSong();
   }, [songId]);
 
-  // 2. Sincronizar con el tono de la Playlist (Especial para cuando abres un enlace compartido)
+  // 3. Sincronizar y reparar notas faltantes en la Playlist
   useEffect(() => {
-    if (playlist.length > 0 && songId) {
+    if (playlist.length > 0 && songId && originalKey) {
       const savedInPlaylist = playlist.find(s => s.id === songId);
-      if (savedInPlaylist?.key && savedInPlaylist.key !== 'orig') {
-        setCurrentKey(savedInPlaylist.key);
-        hasAppliedInitialKey.current = true;
+      if (savedInPlaylist) {
+        if (savedInPlaylist.key && savedInPlaylist.key !== 'orig') {
+          setCurrentKey(savedInPlaylist.key);
+          hasAppliedInitialKey.current = true;
+        } else if (!savedInPlaylist.key) {
+          // SOLUCIÓN A LA NOTA "-": Si la canción se agregó desde el buscador (sin nota),
+          // ahora que la hemos detectado, actualizamos la playlist silenciosamente.
+          updateSongKey(songId, originalKey);
+        }
       }
     }
-  }, [playlist, songId]);
+  }, [playlist, songId, originalKey, updateSongKey]);
 
-  // 3. Efecto para transponer los acordes visualmente
+  // 4. Efecto para transponer los acordes visualmente
   useEffect(() => {
     if (!songRef.current || !songHtml) return;
 
@@ -98,31 +108,52 @@ export default function SongPage() {
     });
   }, [currentKey, originalKey, songHtml]);
 
+  // Manejador para agregar la canción desde el FAB (+ / -)
+  const handleTogglePlaylist = () => {
+    if (isInPlaylist(songId)) {
+      removeFromPlaylist(songId);
+    } else {
+      let extractTitle = "Canción sin título";
+      if (songRef.current) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = songHtml;
+        const firstLine = tempDiv.textContent?.split('\n')[0]?.trim();
+        if (firstLine) extractTitle = firstLine;
+      }
+      addToPlaylist({ id: songId, name: extractTitle, key: currentKey });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-100 font-montserrat p-4 text-center">
-        <p className="text-xl font-bold text-gray-600 animate-pulse">Cargando canción...</p>
+        <p className="text-xl font-bold text-[#33658A] animate-pulse">Cargando canción...</p>
       </div>
     );
   }
 
+  const isAdded = isInPlaylist(songId);
+
   return (
-    <main className="p-4 sm:p-10 font-montserrat flex flex-col items-center bg-gray-100 min-h-screen">
+    <main className="p-4 sm:p-10 font-montserrat flex flex-col items-center min-h-screen pb-32">
       
-      {/* Herramientas */}
-      <div className="mb-6 sm:mb-8 bg-white p-3 sm:p-4 shadow-lg rounded-xl flex flex-wrap items-center justify-center gap-4 sm:gap-6 top-4 z-20 border border-gray-200 w-full max-w-[21cm]">
-        <div className="flex flex-col items-center sm:items-start">
-          <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Tono Actual</span>
+      {/* MENÚ FLOTANTE VERTICAL (Botones 1 y 2) */}
+      <div className="fixed bottom-[96px] right-6 z-[50] flex flex-col gap-4 items-center">
+        
+        {/* BOTÓN 1: Selector de Tono */}
+        <div 
+          className="relative w-12 h-12 bg-[#33658A] text-[#F6AE2D] rounded-full shadow-lg flex items-center justify-center font-black text-sm border-2 border-[#55DDE0]/30 hover:border-[#55DDE0] transition-colors"
+          title="Cambiar Tono"
+        >
+          {currentKey}
           <select 
             value={currentKey} 
             onChange={(e) => {
               const newKey = e.target.value;
               setCurrentKey(newKey);
-              if (isInPlaylist(songId)) {
-                updateSongKey(songId, newKey);
-              }
+              if (isAdded) updateSongKey(songId, newKey);
             }}
-            className="p-1 text-lg bg-transparent text-blue-600 font-black focus:outline-none cursor-pointer"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           >
             {CHROMATIC_SCALE.map((note: string) => (
               <option key={note} value={note}>{note}</option>
@@ -130,26 +161,26 @@ export default function SongPage() {
           </select>
         </div>
 
-        <div className="h-8 w-[1px] bg-gray-200 hidden sm:block"></div>
-
+        {/* BOTÓN 2: Agregar/Quitar (+ / -) */}
         <button 
-          onClick={() => {
-            setCurrentKey(originalKey);
-            if (isInPlaylist(songId)) {
-              updateSongKey(songId, originalKey);
-            }
-          }}
-          className="px-4 py-2 bg-gray-50 hover:bg-red-50 text-gray-500 hover:text-red-600 rounded-lg text-xs font-bold transition-colors w-full sm:w-auto"
+          onClick={handleTogglePlaylist}
+          className={`w-12 h-12 rounded-full shadow-lg flex items-center justify-center font-black text-2xl transition-all border-2 ${
+            isAdded 
+              ? "bg-[#F26419] text-white border-[#F26419]/50 hover:bg-red-600" 
+              : "bg-[#33658A] text-[#55DDE0] border-[#55DDE0]/30 hover:border-[#55DDE0]"
+          }`}
+          title={isAdded ? "Quitar de la Playlist" : "Añadir a la Playlist"}
         >
-          RESETEAR ({originalKey})
+          {isAdded ? "−" : "+"}
         </button>
+
       </div>
 
       {/* Papel de la canción */}
-      <div className="bg-white p-4 sm:p-16 shadow-md sm:shadow-2xl rounded-sm w-full max-w-none sm:max-w-[21cm] mb-20">
+      <div className="bg-white p-4 sm:p-16 shadow-md sm:shadow-2xl rounded-sm w-full max-w-none sm:max-w-[21cm] mb-10">
         <div 
           ref={songRef}
-          className="whitespace-pre text-[15px] sm:text-[17px] leading-[1.5] text-gray-900" // Cambiado leading-1.7 a 1.5
+          className="whitespace-pre text-[15px] sm:text-[17px] leading-[1.5] text-[#2F4858]"
           style={{ fontFamily: 'var(--font-montserrat)' }}
           dangerouslySetInnerHTML={{ __html: songHtml }} 
         />

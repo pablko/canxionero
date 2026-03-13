@@ -16,6 +16,9 @@ interface PlaylistContextType {
   reorderPlaylist: (startIndex: number, endIndex: number) => void;
   isInPlaylist: (id: string) => boolean;
   clearPlaylist: () => void;
+  undoClear: () => void;
+  clearBackup: () => void; // NUEVO: Para limpiar la caché de deshacer
+  canUndo: boolean;
   isImporting: boolean;
 }
 
@@ -23,12 +26,12 @@ const PlaylistContext = createContext<PlaylistContextType | undefined>(undefined
 
 export function PlaylistProvider({ children }: { children: React.ReactNode }) {
   const [playlist, setPlaylist] = useState<Song[]>([]);
+  const [lastBackup, setLastBackup] = useState<Song[] | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const isImportedRef = useRef(false);
   const router = useRouter();
   const pathname = usePathname();
 
-  // 1. Carga inicial e IMPORTACIÓN (Limpiando URL)
   useEffect(() => {
     if (isImportedRef.current) return;
     
@@ -43,7 +46,7 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
           const parts = item.split(':');
           return { 
             id: parts[0], 
-            key: (!parts[1] || parts[1] === 'orig') ? undefined : parts[1], 
+            key: parts[1] || 'C', // Siempre guardamos una nota, no 'orig'
             name: "Cargando..." 
           };
         }).filter((s: Song) => s.id);
@@ -51,9 +54,6 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
         if (decoded.length > 0) {
           setPlaylist(decoded);
           localStorage.setItem('canxionero-playlist', JSON.stringify(decoded));
-          
-          // LIMPIEZA DE URL: Eliminamos el ?list=... de la barra de direcciones
-          // Esto evita que al recargar se vuelva a disparar la importación
           router.replace(pathname);
         }
       } catch (e) {
@@ -62,7 +62,6 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
         setIsImporting(false);
       }
     } else {
-      // Si no hay lista en URL, cargamos lo que haya en LocalStorage
       const saved = localStorage.getItem('canxionero-playlist');
       if (saved) {
         try {
@@ -74,7 +73,6 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
     }
   }, [pathname, router]);
 
-  // 2. Recuperar nombres reales de la API Bulk
   useEffect(() => {
     const fetchNames = async () => {
       const missing = playlist.filter((s: Song) => s.name === "Cargando...");
@@ -110,6 +108,7 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('canxionero-playlist', JSON.stringify(newList));
       return newList;
     });
+    setLastBackup(null);
   };
 
   const removeFromPlaylist = (id: string) => {
@@ -141,16 +140,39 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
   const isInPlaylist = (id: string) => playlist.some((s: Song) => s.id === id);
 
   const clearPlaylist = () => {
-    localStorage.removeItem('canxionero-playlist');
-    setPlaylist([]);
-    // Forzamos navegación al index para limpiar cualquier rastro en la URL si lo hubiera
-    router.replace(pathname);
+    if (playlist.length > 0) {
+      setLastBackup([...playlist]);
+      localStorage.removeItem('canxionero-playlist');
+      setPlaylist([]);
+    }
+  };
+
+  const undoClear = () => {
+    if (lastBackup) {
+      setPlaylist(lastBackup);
+      localStorage.setItem('canxionero-playlist', JSON.stringify(lastBackup));
+      setLastBackup(null);
+    }
+  };
+
+  // NUEVA FUNCIÓN: Si cierras el modal vacío, se pierde la opción de deshacer
+  const clearBackup = () => {
+    setLastBackup(null);
   };
 
   return (
     <PlaylistContext.Provider value={{ 
-      playlist, addToPlaylist, removeFromPlaylist, 
-      updateSongKey, reorderPlaylist, isInPlaylist, clearPlaylist, isImporting 
+      playlist, 
+      addToPlaylist, 
+      removeFromPlaylist, 
+      updateSongKey, 
+      reorderPlaylist, 
+      isInPlaylist, 
+      clearPlaylist, 
+      undoClear, 
+      clearBackup, 
+      canUndo: lastBackup !== null, 
+      isImporting 
     }}>
       {children}
     </PlaylistContext.Provider>
