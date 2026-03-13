@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-// Importamos el hook de la playlist
+import { useSearchParams } from 'next/navigation';
 import { usePlaylist } from '@/src/context/PlaylistContext';
 
 interface Song {
@@ -13,8 +13,9 @@ interface Song {
 
 export default function SongListClient({ initialSongs }: { initialSongs: Song[] }) {
   const [songs, setSongs] = useState(initialSongs);
-  const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const searchTerm = searchParams.get('q') || '';
   
   // Usamos el contexto de la Playlist
   const { addToPlaylist, removeFromPlaylist, isInPlaylist } = usePlaylist();
@@ -59,13 +60,6 @@ export default function SongListClient({ initialSongs }: { initialSongs: Song[] 
 
       {/* BUSCADOR */}
       <div className="relative">
-        <input
-          type="text"
-          placeholder="Buscar título o letra..."
-          className="w-full p-4 pl-12 bg-white shadow-sm border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all text-gray-700"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
         <div className="absolute left-4 top-4">
           {loading ? (
             <div className="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>

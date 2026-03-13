@@ -1,42 +1,33 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono, Montserrat } from "next/font/google";
-import "./globals.css";
+// app/layout.tsx
+import './globals.css';
 import { PlaylistProvider } from '@/src/context/PlaylistContext';
 import FloatingPlaylist from '@/src/components/FloatingPlaylist';
+import Navbar from '@/src/components/Navbar'; 
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-const montserrat = Montserrat({ 
-  subsets: ['latin'],
-  weight: ['500', '600', '700', '800', '900'], 
-  variable: '--font-montserrat',
-});
-
-export const metadata: Metadata = {
-  title: "Canxionero",
+export const metadata = {
+  title: 'Canxionero',
+  description: 'Tu cancionero personal inteligente',
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="es">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} ${montserrat.variable} font-sans antialiased`}
-      >
-        {/* 2. Envolvemos los children con el Provider */}
+      {/* Añadimos bg-gray-100 al body global para mantener la consistencia */}
+      <body className="font-montserrat bg-gray-100 text-gray-900 min-h-screen">
         <PlaylistProvider>
-          {children}
+          {/* 1. Navbar global */}
+          <Navbar />
+          
+          {/* 2. El pt-[76px] sm:pt-[64px] compensa la altura del Navbar fixed */}
+          <div className="pt-[100px] sm:pt-[70px]">
+            {children}
+          </div>
+
+          {/* 3. Playlist Flotante global */}
           <FloatingPlaylist />
         </PlaylistProvider>
       </body>

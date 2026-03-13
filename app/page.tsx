@@ -15,13 +15,6 @@ export default async function HomePage() {
   return (
     <main className="p-6 md:p-12 bg-gray-50 min-h-screen font-montserrat">
       <div className="max-w-4xl mx-auto">
-        <header className="mb-10 text-center">
-          <h1 className="text-4xl font-black text-gray-900 mb-2 tracking-tight">
-            <span className="text-blue-600">CANXIONERO</span>
-          </h1>
-        </header>
-
-        {/* Ahora 'songs' es del tipo exacto que espera SongListClient */}
         <SongListClient initialSongs={songs} />
       </div>
     </main>
