@@ -16,7 +16,7 @@ export default async function HomePage() {
   return (
     <main className="p-6 md:p-12 bg-gray-50 min-h-screen font-montserrat">
       <div className="max-w-4xl mx-auto">
-        Suspense fallback={<div>Cargando lista...</div>}>
+        <Suspense fallback={<div>Cargando lista...</div>}>
           <SongListClient initialSongs={songs} />
       </Suspense>
       </div>
