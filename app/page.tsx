@@ -1,4 +1,5 @@
 import { getSongsList } from '../src/lib/googleDrive';
+import { Suspense } from 'react';
 import SongListClient from '../src/components/SongListClient';
 
 export default async function HomePage() {
@@ -15,7 +16,9 @@ export default async function HomePage() {
   return (
     <main className="p-6 md:p-12 bg-gray-50 min-h-screen font-montserrat">
       <div className="max-w-4xl mx-auto">
-        <SongListClient initialSongs={songs} />
+        <Suspense fallback={<div>Cargando lista...</div>}>
+          <SongListClient initialSongs={data} />
+      </Suspense>
       </div>
     </main>
   );
