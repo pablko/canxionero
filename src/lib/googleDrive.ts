@@ -52,7 +52,7 @@ export async function getSongContent(documentId: string) {
         const paragraphText = element.paragraph.elements
           ?.map(el => el.textRun?.content || "")
           .join("")
-          .trim();
+          .trim() || ""; // Aseguramos que si es undefined, sea un string vacío
 
         if (paragraphText.length > 0) {
           lineCounter++;
