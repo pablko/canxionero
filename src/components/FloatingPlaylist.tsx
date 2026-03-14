@@ -1,5 +1,5 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { usePlaylist } from '@/src/context/PlaylistContext';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -8,11 +8,25 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 export default function FloatingPlaylist() {
   const { playlist, removeFromPlaylist, clearPlaylist, reorderPlaylist, undoClear, canUndo, clearBackup } = usePlaylist();
   const [isOpen, setIsOpen] = useState(false);
-  const [showToast, setShowToast] = useState(false);
   const [emptyAlert, setEmptyAlert] = useState(false);
+  const [isCopied, setIsCopied] = useState(false); // NUEVO: Estado para el botón de copiado
   
   const pathname = usePathname();
   const isHome = pathname === '/';
+
+  // NUEVO: Referencia para el contenedor de la playlist
+  const playlistRef = useRef<HTMLDivElement>(null);
+
+  // NUEVO: Cerrar la playlist al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isOpen && playlistRef.current && !playlistRef.current.contains(event.target as Node)) {
+        handleCloseModal();
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen, playlist.length]);
 
   if (isHome && playlist.length === 0 && !canUndo) return null;
 
@@ -26,13 +40,38 @@ export default function FloatingPlaylist() {
 
   const copyToClipboard = async () => {
     if (playlist.length === 0) return;
-    // Si alguna canción no tiene key, enviamos C por defecto para no romper la URL
     const listData = playlist.map(s => `${s.id}:${s.key || 'C'}`).join(',');
     const shareUrl = `${window.location.origin}/song/${playlist[0].id}?list=${listData}`;
     
-    await navigator.clipboard.writeText(shareUrl);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 2000);
+    try {
+      // Intentamos usar el API moderno si está disponible (Producción / HTTPS)
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        // FALLBACK: Para móviles en red local (HTTP)
+        const textArea = document.createElement("textarea");
+        textArea.value = shareUrl;
+        
+        // Evitamos que el celular haga scroll raro o abra el teclado virtual
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      
+      // Si todo sale bien, activamos la animación visual
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+
+    } catch (error) {
+      console.error("Error al copiar el enlace:", error);
+    }
   };
 
   const handleCloseModal = () => {
@@ -53,22 +92,16 @@ export default function FloatingPlaylist() {
 
   return (
     <>
-      {showToast && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] bg-[#33658A] text-white px-6 py-3 rounded-full shadow-xl font-bold animate-in fade-in zoom-in duration-300">
-          Enlace copiado al portapapeles 📋
+      {/* Alerta Lista Vacía flotando a la izquierda del botón */}
+      {emptyAlert && (
+        <div className="fixed bottom-9 right-28 bg-[#F26419] text-white px-4 py-2 rounded-xl shadow-lg font-bold animate-in fade-in slide-in-from-right-4 duration-300 whitespace-nowrap z-[100] border border-[#F6AE2D]/50 text-sm">
+          La lista está vacía 🎵
         </div>
       )}
 
-      {/* El contenedor principal de la lista flotante */}
-      <div className="fixed bottom-6 right-6 z-[60] font-montserrat flex flex-col items-end">
+      {/* Se añade la referencia playlistRef al contenedor principal */}
+      <div className="fixed bottom-6 right-6 z-[60] font-montserrat flex flex-col items-end" ref={playlistRef}>
         
-        {/* SOLUCIÓN AL ALERT: Ahora sale a la izquierda del botón principal flotando */}
-        {emptyAlert && (
-          <div className="absolute bottom-3 right-20 bg-[#F26419] text-white px-4 py-2 rounded-xl shadow-lg font-bold animate-in fade-in slide-in-from-right-4 duration-300 whitespace-nowrap z-[100] border border-[#F6AE2D]/50 text-sm">
-            La lista está vacía 🎵
-          </div>
-        )}
-
         {isOpen && (playlist.length > 0 || canUndo) ? (
           <div className="bg-white shadow-2xl rounded-2xl border border-gray-200 w-[85vw] sm:w-80 max-h-[70vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300 mb-2">
             <div className="p-4 bg-[#33658A] text-white flex justify-between items-center">
@@ -93,7 +126,6 @@ export default function FloatingPlaylist() {
                                 </div>
                                 <Link href={`/song/${song.id}`} onClick={handleCloseModal} className="flex-1 p-3 bg-white border border-gray-200 rounded-xl text-[11px] font-bold text-[#2F4858] flex justify-between items-center shadow-sm">
                                   <span className="truncate italic">- {formatTitle(song.name)}</span>
-                                  {/* Renderiza siempre el tono (y si venía del buscador y no entraste, un '-') */}
                                   <span className="bg-[#55DDE0]/20 text-[#33658A] px-2 py-0.5 rounded text-[10px] font-black border border-[#55DDE0]/50 ml-2">
                                     {song.key || '-'}
                                   </span>
@@ -116,18 +148,29 @@ export default function FloatingPlaylist() {
             </div>
 
             <div className="p-4 border-t bg-white flex justify-center items-center gap-8 shrink-0">
+              
+              {/* BOTÓN COPIAR MODIFICADO */}
               <button onClick={copyToClipboard} className="group flex flex-col items-center gap-1 transition-all" title="Copiar Enlace">
-                <div className="w-12 h-12 bg-[#33658A]/10 group-hover:bg-[#33658A] rounded-full flex items-center justify-center transition-colors">
-                  <svg className="w-5 h-5 fill-[#33658A] group-hover:fill-white transition-colors" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                    <g id="SVGRepo_iconCarrier">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${isCopied ? 'bg-[#55DDE0]' : 'bg-[#33658A]/10 group-hover:bg-[#33658A]'}`}>
+                  {isCopied ? (
+                    // Checkmark cuando se copia
+                    <svg className="w-6 h-6 stroke-[#2F4858]" fill="none" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    // Documento original
+                    <svg className="w-5 h-5 fill-[#33658A] group-hover:fill-white transition-colors" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
                       <path d="M13.49 3 10.74.37A1.22 1.22 0 0 0 9.86 0h-4a1.25 1.25 0 0 0-1.22 1.25v11a1.25 1.25 0 0 0 1.25 1.25h6.72a1.25 1.25 0 0 0 1.25-1.25V3.88a1.22 1.22 0 0 0-.37-.88zm-.88 9.25H5.89v-11h2.72v2.63a1.25 1.25 0 0 0 1.25 1.25h2.75zm0-8.37H9.86V1.25l2.75 2.63z"></path>
                       <path d="M10.11 14.75H3.39v-11H4V2.5h-.61a1.25 1.25 0 0 0-1.25 1.25v11A1.25 1.25 0 0 0 3.39 16h6.72a1.25 1.25 0 0 0 1.25-1.25v-.63h-1.25z"></path>
-                    </g>
-                  </svg>
+                    </svg>
+                  )}
                 </div>
-                <span className="text-[9px] font-bold text-[#33658A] uppercase tracking-tighter">Copiar</span>
+                <span className={`text-[9px] font-bold uppercase tracking-tighter ${isCopied ? 'text-[#55DDE0]' : 'text-[#33658A]'}`}>
+                  {isCopied ? 'Copiado' : 'Copiar'}
+                </span>
               </button>
 
+              {/* Botón Deshacer/Vaciar intacto */}
               {canUndo ? (
                 <button onClick={undoClear} className="group flex flex-col items-center gap-1 animate-in zoom-in duration-300" title="Deshacer vaciado">
                   <div className="w-12 h-12 bg-[#55DDE0]/20 group-hover:bg-[#55DDE0] rounded-full flex items-center justify-center transition-colors border border-[#55DDE0]/50">
