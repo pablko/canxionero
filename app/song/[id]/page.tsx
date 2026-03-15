@@ -19,7 +19,7 @@ export default function SongPage() {
   const params = useParams();
   const songId = params?.id as string;
 
-  // 1. SOLUCIÓN AL SCROLL: Obligamos a ir arriba cuando se carga el HTML
+  // 1. SOLUCIÓN AL SCROLL
   useEffect(() => {
     if (songHtml) {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -62,7 +62,6 @@ export default function SongPage() {
         if (!hasAppliedInitialKey.current) {
           setCurrentKey(detectedKey);
         }
-
       } catch (e) { 
         console.error("Error al cargar canción:", e);
       } finally {
@@ -81,8 +80,6 @@ export default function SongPage() {
           setCurrentKey(savedInPlaylist.key);
           hasAppliedInitialKey.current = true;
         } else if (!savedInPlaylist.key) {
-          // SOLUCIÓN A LA NOTA "-": Si la canción se agregó desde el buscador (sin nota),
-          // ahora que la hemos detectado, actualizamos la playlist silenciosamente.
           updateSongKey(songId, originalKey);
         }
       }
@@ -102,13 +99,11 @@ export default function SongPage() {
         originalChord = (el.textContent || "").replace(/\u00A0/g, " ");
         el.setAttribute('data-original', originalChord);
       }
-
       const newChord = transposeFullChord(originalChord, semitones);
       el.textContent = newChord;
     });
   }, [currentKey, originalKey, songHtml]);
 
-  // Manejador para agregar la canción desde el FAB (+ / -)
   const handleTogglePlaylist = () => {
     if (isInPlaylist(songId)) {
       removeFromPlaylist(songId);
@@ -137,7 +132,7 @@ export default function SongPage() {
   return (
     <main className="p-4 sm:p-10 font-montserrat flex flex-col items-center min-h-screen pb-32">
       
-      {/* MENÚ FLOTANTE VERTICAL (Botones 1 y 2) */}
+      {/* MENÚ FLOTANTE VERTICAL (Solo Botones 1 y 2) */}
       <div className="fixed bottom-[96px] right-6 z-[50] flex flex-col gap-4 items-center">
         
         {/* BOTÓN 1: Selector de Tono */}
@@ -176,12 +171,28 @@ export default function SongPage() {
 
       </div>
 
-      {/* Papel de la canción */}
-      <div className="bg-white p-4 sm:p-16 shadow-md sm:shadow-2xl rounded-sm w-full max-w-none sm:max-w-[21cm] mb-10">
+      {/* PAPEL DE LECTURA: A4 CONFIGURADO CON 2 COLUMNAS (Intacto) */}
+      <div 
+        className="bg-white p-4 md:p-[1.5cm] shadow-md sm:shadow-2xl rounded-sm mx-auto mb-10 overflow-hidden relative"
+        style={{
+          width: '100%',
+          maxWidth: '21cm',
+          minHeight: '29.7cm',
+        }}
+      >
         <div 
           ref={songRef}
-          className="whitespace-pre text-[15px] sm:text-[17px] leading-[1.5] text-[#2F4858]"
-          style={{ fontFamily: 'var(--font-montserrat)' }}
+          className="text-[#2F4858]"
+          style={{ 
+            fontFamily: 'var(--font-montserrat)',
+            fontSize: '14px', 
+            lineHeight: '1.3', 
+            whiteSpace: 'pre-wrap',
+            columnCount: typeof window !== 'undefined' && window.innerWidth >= 768 ? 2 : 1,
+            columnGap: '2rem',
+            columnFill: 'auto',
+            height: '100%', 
+          }}
           dangerouslySetInnerHTML={{ __html: songHtml }} 
         />
       </div>

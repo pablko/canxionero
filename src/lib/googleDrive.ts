@@ -45,79 +45,82 @@ export async function getSongContent(documentId: string) {
     const res = await docs.documents.get({ documentId });
     let htmlContent = "";
     let lineCounter = 0;
+    
+    let isInsideSection = false;
 
     res.data.body?.content?.forEach((element) => {
       if (element.paragraph) {
-        // Verificamos si el párrafo tiene contenido real antes de contar la línea
         const paragraphText = element.paragraph.elements
           ?.map(el => el.textRun?.content || "")
-          .join("")
-          .trim() || ""; // Aseguramos que si es undefined, sea un string vacío
+          .join("") || "";
 
-        if (paragraphText.length > 0) {
+        const isEmptyParagraph = paragraphText.trim() === "";
+
+        if (!isEmptyParagraph) {
           lineCounter++;
         }
 
-        element.paragraph.elements?.forEach((el) => {
-          if (el.textRun) {
-            const style = el.textRun.textStyle;
-            const contentText = el.textRun.content || "";
-            
-            // --- DETECCIÓN CRÍTICA: ¿Es solo un salto de línea? ---
-            const isJustANewLine = contentText === "\n";
+        if (lineCounter > 2) {
+          const isSectionHeader = /^(VERSO|CORO|PUENTE|INTERLUDIO|PRE-CORO|PRE CORO|INTRO|OUTRO|FINAL|INSTRUMENTAL|CODA)(\s.*)?$/i.test(paragraphText.trim());
+          
+          if (isSectionHeader) {
+            if (isInsideSection) {
+              htmlContent += "</div>"; 
+            }
+            htmlContent += `<div style="break-inside: avoid; page-break-inside: avoid; margin-bottom: 1.5rem;">`;
+            isInsideSection = true;
+          } else if (!isInsideSection && !isEmptyParagraph) {
+            htmlContent += `<div style="break-inside: avoid; page-break-inside: avoid; margin-bottom: 1.5rem;">`;
+            isInsideSection = true;
+          }
+        }
 
-            // Solo aplicamos estilos de cabecera si NO es un simple salto de línea
-            let headerStyle = "";
-            if (!isJustANewLine) {
+        if (!isEmptyParagraph) {
+          element.paragraph.elements?.forEach((el) => {
+            if (el.textRun) {
+              const style = el.textRun.textStyle;
+              const contentText = el.textRun.content || "";
+              
+              let headerStyle = "";
               if (lineCounter === 1) {
-                headerStyle = "font-size: 26px; font-weight: 800; line-height: 1;";
+                headerStyle = "font-size: 26px; font-weight: 800; line-height: 1.2; display: block; column-span: all; -webkit-column-span: all; margin-bottom: 4px;";
               } else if (lineCounter === 2) {
-                headerStyle = "font-size: 18px; font-weight: 400; line-height: 1; color: #666;";
+                headerStyle = "font-size: 16px; font-weight: 400; line-height: 1.2; color: #666; display: block; column-span: all; -webkit-column-span: all; margin-bottom: 24px;";
               }
-            }
 
-            // Lógica de color de acordes
-            const rgb = style?.foregroundColor?.color?.rgbColor;
-            const isChordColor = rgb && 
-                                 rgb.red === 1 && 
-                                 rgb.green && rgb.green > 0.45 && rgb.green < 0.48;
+              const rgb = style?.foregroundColor?.color?.rgbColor;
+              const isChordColor = rgb && rgb.red === 1 && rgb.green && rgb.green > 0.45 && rgb.green < 0.48;
 
-            // Pesos de fuente
-            const gWeight = style?.weightedFontFamily?.weight;
-            const isBold = style?.bold;
-            let finalWeight = 400;
-            if (gWeight === 800) finalWeight = 900;
-            else if (isBold === true) finalWeight = 700;
+              let finalWeight = 400;
+              if (style?.weightedFontFamily?.weight === 800) finalWeight = 900;
+              else if (style?.bold === true) finalWeight = 700;
 
-            const underlineStyle = style?.underline ? "text-decoration: underline;" : "";
+              const underlineStyle = style?.underline ? "text-decoration: underline;" : "";
 
-            let colorStyle = "";
-            if (rgb) {
-              const r = Math.round((rgb.red || 0) * 255);
-              const g = Math.round((rgb.green || 0) * 255);
-              const b = Math.round((rgb.blue || 0) * 255);
-              colorStyle = `color: rgb(${r}, ${g}, ${b});`;
-            }
+              let colorStyle = "";
+              if (rgb) {
+                colorStyle = `color: rgb(${Math.round(rgb.red! * 255)}, ${Math.round(rgb.green! * 255)}, ${Math.round(rgb.blue! * 255)});`;
+              }
 
-            const escapedText = contentText
-              .replace(/&/g, "&amp;")
-              .replace(/</g, "&lt;")
-              .replace(/>/g, "&gt;");
+              const escapedText = contentText
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
 
-            if (isChordColor) {
-              htmlContent += `<span data-chord="true" style="font-weight: 700; color: rgb(255, 119, 0); cursor: pointer; ${headerStyle}">${escapedText}</span>`;
-            } else {
-              // Si es un salto de línea (\n), lo imprimimos pelado, sin font-size
-              if (isJustANewLine) {
-                htmlContent += `<span>${escapedText}</span>`;
+              if (isChordColor) {
+                htmlContent += `<span data-chord="true" style="font-weight: 700; color: rgb(255, 119, 0); cursor: pointer; ${headerStyle}">${escapedText}</span>`;
               } else {
                 htmlContent += `<span style="font-weight: ${finalWeight}; ${colorStyle} ${underlineStyle} ${headerStyle}">${escapedText}</span>`;
               }
             }
-          }
-        });
+          });
+        }
       }
     });
+
+    if (isInsideSection) {
+      htmlContent += "</div>";
+    }
 
     return { title: res.data.title, html: htmlContent };
   } catch (error) {
