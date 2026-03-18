@@ -1,4 +1,3 @@
-// app/song/[id]/page.tsx
 "use client";
 
 import { useEffect, useState, useRef } from 'react';
@@ -41,7 +40,6 @@ export default function SongPage() {
           setDocTitle(data.title);
         }
         
-        // ¡FRONTEND LIMPIO! Tomamos la tonalidad mágica que nos mandó el backend
         const detectedKey = data.originalKey || "C";
 
         setOriginalKey(detectedKey);
@@ -141,8 +139,11 @@ export default function SongPage() {
           for (let i = 0; i < parts.length; i++) {
             currentLineText += parts[i];
             
-            if (isChord) currentLineIsChord = true;
-            if (spanWeight > currentLineWeight) currentLineWeight = spanWeight;
+            // 🛑 CORTAFUEGOS: Solo cambia el color si es texto real
+            if (parts[i].trim() !== "") {
+              if (isChord) currentLineIsChord = true;
+              if (spanWeight > currentLineWeight) currentLineWeight = spanWeight;
+            }
 
             if (i < parts.length - 1) {
               lines.push({

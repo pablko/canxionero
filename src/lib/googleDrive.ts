@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { detectScale } from './musicUtils'; // <-- IMPORTAMOS EL DETECTOR
+import { detectScale } from './musicUtils';
 
 const getPrivateKey = () => {
   const key = process.env.GOOGLE_PRIVATE_KEY;
@@ -48,7 +48,6 @@ export async function getSongContent(documentId: string) {
     let lineCounter = 0;
     let isInsideSection = false;
     
-    // --- VARIABLES PARA EL CEREBRO MUSICAL ---
     let detectedNote: string | null = null;
     const chordsInSong: string[] = [];
 
@@ -62,6 +61,12 @@ export async function getSongContent(documentId: string) {
         const noteMatch = paragraphText.match(/Nota:\s*([A-G][#b]?)/i);
         if (noteMatch) {
           detectedNote = noteMatch[1].toUpperCase();
+          
+          // 🛑 MAGIA AQUÍ: 
+          // Como ya guardamos la nota en la variable 'detectedNote', 
+          // hacemos un 'return' para saltarnos este párrafo. 
+          // De esta forma, jamás se añade al 'htmlContent' y desaparece de la app y los PDFs.
+          return; 
         }
 
         const isEmptyParagraph = paragraphText.trim() === "";
@@ -71,7 +76,7 @@ export async function getSongContent(documentId: string) {
         }
 
         if (lineCounter > 2) {
-          const isSectionHeader = /^(VERSO|CORO|PUENTE|INTERLUDIO|REFRAIN|PRE-CORO|PRE CORO|INTRO|OUTRO|FINAL|INSTRUMENTAL|CODA)(\s.*)?$/i.test(paragraphText.trim());
+          const isSectionHeader = /^(VERSO|CORO|PUENTE|INTERLUDIO|PRE-CORO|PRE CORO|INTRO|OUTRO|FINAL|INSTRUMENTAL|CODA)(\s.*)?$/i.test(paragraphText.trim());
           
           if (isSectionHeader) {
             if (isInsideSection) {
@@ -120,7 +125,6 @@ export async function getSongContent(documentId: string) {
               if (isChordColor) {
                 htmlContent += `<span data-chord="true" style="font-weight: 700; color: rgb(255, 119, 0); cursor: pointer; ${headerStyle}">${escapedText}</span>`;
                 
-                // 2. Guardamos silenciosamente todos los acordes que encontremos
                 const found = escapedText.match(/([A-G][#b]?m?)(?:\/([A-G][#b]?))?/g);
                 if (found) chordsInSong.push(...found);
               } else {
@@ -136,13 +140,11 @@ export async function getSongContent(documentId: string) {
       htmlContent += "</div>";
     }
 
-    // 3. Resolvemos la tonalidad definitiva (Prioridad a lo escrito, respaldo algorítmico)
     let finalOriginalKey = detectedNote;
     if (!finalOriginalKey) {
       finalOriginalKey = detectScale(chordsInSong);
     }
 
-    // Devolvemos el paquete con la llave original incluida
     return { title: res.data.title, html: htmlContent, originalKey: finalOriginalKey };
   } catch (error) {
     console.error("Error al obtener contenido de Google Docs:", error);

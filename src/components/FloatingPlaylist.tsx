@@ -4,20 +4,35 @@ import { usePlaylist } from '@/src/context/PlaylistContext';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { transposeFullChord, getSemitonesBetween } from '@/src/lib/musicUtils';
+
+const getNextSundayFormatted = () => {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); 
+  const daysUntilSunday = (7 - dayOfWeek) % 7; 
+  
+  const nextSunday = new Date(today);
+  nextSunday.setDate(today.getDate() + daysUntilSunday);
+  
+  const day = String(nextSunday.getDate()).padStart(2, '0');
+  const month = String(nextSunday.getMonth() + 1).padStart(2, '0');
+  const year = nextSunday.getFullYear();
+  
+  return `${day}-${month}-${year}`;
+};
 
 export default function FloatingPlaylist() {
   const { playlist, removeFromPlaylist, clearPlaylist, reorderPlaylist, undoClear, canUndo, clearBackup } = usePlaylist();
   const [isOpen, setIsOpen] = useState(false);
   const [emptyAlert, setEmptyAlert] = useState(false);
-  const [isCopied, setIsCopied] = useState(false); // NUEVO: Estado para el botón de copiado
+  const [isCopied, setIsCopied] = useState(false); 
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false); 
   
   const pathname = usePathname();
   const isHome = pathname === '/';
 
-  // NUEVO: Referencia para el contenedor de la playlist
   const playlistRef = useRef<HTMLDivElement>(null);
 
-  // NUEVO: Cerrar la playlist al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (isOpen && playlistRef.current && !playlistRef.current.contains(event.target as Node)) {
@@ -44,31 +59,22 @@ export default function FloatingPlaylist() {
     const shareUrl = `${window.location.origin}/song/${playlist[0].id}?list=${listData}`;
     
     try {
-      // Intentamos usar el API moderno si está disponible (Producción / HTTPS)
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(shareUrl);
       } else {
-        // FALLBACK: Para móviles en red local (HTTP)
         const textArea = document.createElement("textarea");
         textArea.value = shareUrl;
-        
-        // Evitamos que el celular haga scroll raro o abra el teclado virtual
         textArea.style.position = "fixed";
         textArea.style.left = "-999999px";
         textArea.style.top = "-999999px";
-        
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
-        
         document.execCommand('copy');
         document.body.removeChild(textArea);
       }
-      
-      // Si todo sale bien, activamos la animación visual
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
-
     } catch (error) {
       console.error("Error al copiar el enlace:", error);
     }
@@ -90,16 +96,146 @@ export default function FloatingPlaylist() {
     }
   };
 
+  const handleDownloadPlaylistPDF = async () => {
+    if (playlist.length === 0) return;
+    setIsGeneratingPdf(true);
+
+    try {
+      const songsDataPayload = await Promise.all(
+        playlist.map(async (song) => {
+          const res = await fetch(`/api/song/${song.id}`);
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+
+          const originalKey = data.originalKey || 'C';
+          const targetKey = (song.key && song.key !== 'orig' && song.key !== '-') ? song.key : originalKey;
+          const semitones = getSemitonesBetween(originalKey, targetKey);
+
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = data.html;
+
+          const chordElements = tempDiv.querySelectorAll('[data-chord="true"]');
+          chordElements.forEach((el) => {
+            let originalChord = el.getAttribute('data-original');
+            if (!originalChord) {
+              originalChord = (el.textContent || "").replace(/\u00A0/g, " ");
+            }
+            const newChord = transposeFullChord(originalChord, semitones);
+            el.textContent = newChord;
+          });
+
+          let docTitle = data.title || song.name || "Canción";
+          let title = "Canción";
+          let artist = "Artista";
+
+          if (docTitle.includes('-')) {
+            const parts = docTitle.split('-');
+            title = parts[0].trim();
+            artist = parts.slice(1).join('-').trim();
+          } else {
+            title = docTitle.trim();
+          }
+
+          const sectionsHtml = Array.from(tempDiv.children);
+          const sectionsData: any[] = [];
+
+          sectionsHtml.forEach((section) => {
+            const spans = Array.from(section.querySelectorAll('span'));
+            const lines: any[] = [];
+            let currentLineText = "";
+            let currentLineIsChord = false;
+            let currentLineWeight = 400;
+
+            spans.forEach(span => {
+              if (span.style.fontSize === '26px' || span.style.fontSize === '16px' || span.style.columnSpan === 'all') {
+                return;
+              }
+
+              const text = span.textContent || "";
+              if (!text) return;
+
+              const spanWeight = parseInt(span.style.fontWeight) || 400;
+              const isChord = span.getAttribute('data-chord') === 'true';
+
+              const parts = text.split('\n');
+              for (let i = 0; i < parts.length; i++) {
+                currentLineText += parts[i];
+                
+                // 🛑 SOLUCIÓN AL EFECTO CONTAGIO: 
+                // Solo hereda el color naranja o negrita si el span tiene texto real (ignora espacios invisibles)
+                if (parts[i].trim() !== "") {
+                  if (isChord) currentLineIsChord = true;
+                  if (spanWeight > currentLineWeight) currentLineWeight = spanWeight;
+                }
+
+                if (i < parts.length - 1) {
+                  lines.push({
+                    text: currentLineText.replace(/\u00A0/g, " "),
+                    isChord: currentLineIsChord,
+                    weight: currentLineWeight,
+                    isEmpty: currentLineText.trim() === ""
+                  });
+                  currentLineText = "";
+                  currentLineIsChord = false;
+                  currentLineWeight = 400;
+                }
+              }
+            });
+
+            if (currentLineText) {
+              lines.push({
+                text: currentLineText.replace(/\u00A0/g, " "),
+                isChord: currentLineIsChord,
+                weight: currentLineWeight,
+                isEmpty: currentLineText.trim() === ""
+              });
+            }
+
+            if (lines.some(l => !l.isEmpty)) {
+              sectionsData.push(lines);
+            }
+          });
+
+          return { title, artist, sections: sectionsData };
+        })
+      );
+
+      const response = await fetch('/api/pdf/playlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ songs: songsDataPayload }),
+      });
+
+      if (!response.ok) throw new Error("El servidor no pudo generar la Playlist");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      
+      const sundayDate = getNextSundayFormatted();
+      a.href = url;
+      a.download = `Lista_domingo_${sundayDate}_Canxionero.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+    } catch (error) {
+      console.error("Error al descargar la Playlist:", error);
+      alert("Hubo un error al compilar el PDF de la Playlist.");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   return (
     <>
-      {/* Alerta Lista Vacía flotando a la izquierda del botón */}
       {emptyAlert && (
         <div className="fixed bottom-9 right-28 bg-[#F26419] text-white px-4 py-2 rounded-xl shadow-lg font-bold animate-in fade-in slide-in-from-right-4 duration-300 whitespace-nowrap z-[100] border border-[#F6AE2D]/50 text-sm">
           La lista está vacía 🎵
         </div>
       )}
 
-      {/* Se añade la referencia playlistRef al contenedor principal */}
       <div className="fixed bottom-6 right-6 z-[60] font-montserrat flex flex-col items-end" ref={playlistRef}>
         
         {isOpen && (playlist.length > 0 || canUndo) ? (
@@ -124,7 +260,7 @@ export default function FloatingPlaylist() {
                                 <div {...provided.dragHandleProps} className="text-gray-400 p-1 cursor-grab">
                                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8h16M4 16h16" /></svg>
                                 </div>
-                                <Link href={`/song/${song.id}`} onClick={handleCloseModal} className="flex-1 p-3 bg-white border border-gray-200 rounded-xl text-[11px] font-bold text-[#2F4858] flex justify-between items-center shadow-sm">
+                                <Link href={`/song/${song.id}`} onClick={handleCloseModal} className="flex-1 p-3 bg-white border border-gray-200 rounded-xl text-[11px] font-bold text-[#2F4858] flex justify-between items-center shadow-sm hover:border-[#55DDE0] transition-colors">
                                   <span className="truncate italic">- {formatTitle(song.name)}</span>
                                   <span className="bg-[#55DDE0]/20 text-[#33658A] px-2 py-0.5 rounded text-[10px] font-black border border-[#55DDE0]/50 ml-2">
                                     {song.key || '-'}
@@ -147,18 +283,15 @@ export default function FloatingPlaylist() {
               )}
             </div>
 
-            <div className="p-4 border-t bg-white flex justify-center items-center gap-8 shrink-0">
+            <div className="p-4 border-t bg-white flex justify-center items-center gap-6 shrink-0">
               
-              {/* BOTÓN COPIAR MODIFICADO */}
               <button onClick={copyToClipboard} className="group flex flex-col items-center gap-1 transition-all" title="Copiar Enlace">
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${isCopied ? 'bg-[#55DDE0]' : 'bg-[#33658A]/10 group-hover:bg-[#33658A]'}`}>
                   {isCopied ? (
-                    // Checkmark cuando se copia
                     <svg className="w-6 h-6 stroke-[#2F4858]" fill="none" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
                     </svg>
                   ) : (
-                    // Documento original
                     <svg className="w-5 h-5 fill-[#33658A] group-hover:fill-white transition-colors" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
                       <path d="M13.49 3 10.74.37A1.22 1.22 0 0 0 9.86 0h-4a1.25 1.25 0 0 0-1.22 1.25v11a1.25 1.25 0 0 0 1.25 1.25h6.72a1.25 1.25 0 0 0 1.25-1.25V3.88a1.22 1.22 0 0 0-.37-.88zm-.88 9.25H5.89v-11h2.72v2.63a1.25 1.25 0 0 0 1.25 1.25h2.75zm0-8.37H9.86V1.25l2.75 2.63z"></path>
                       <path d="M10.11 14.75H3.39v-11H4V2.5h-.61a1.25 1.25 0 0 0-1.25 1.25v11A1.25 1.25 0 0 0 3.39 16h6.72a1.25 1.25 0 0 0 1.25-1.25v-.63h-1.25z"></path>
@@ -170,7 +303,6 @@ export default function FloatingPlaylist() {
                 </span>
               </button>
 
-              {/* Botón Deshacer/Vaciar intacto */}
               {canUndo ? (
                 <button onClick={undoClear} className="group flex flex-col items-center gap-1 animate-in zoom-in duration-300" title="Deshacer vaciado">
                   <div className="w-12 h-12 bg-[#55DDE0]/20 group-hover:bg-[#55DDE0] rounded-full flex items-center justify-center transition-colors border border-[#55DDE0]/50">
@@ -194,6 +326,34 @@ export default function FloatingPlaylist() {
                   <span className="text-[9px] font-bold text-[#F26419] uppercase tracking-tighter">Vaciar</span>
                 </button>
               )}
+
+              <button 
+                onClick={handleDownloadPlaylistPDF}
+                disabled={isGeneratingPdf || playlist.length === 0}
+                className={`group flex flex-col items-center gap-1 transition-all ${isGeneratingPdf ? 'opacity-50 cursor-wait' : ''}`} 
+                title="Guardar en PDF"
+              >
+                <div className="w-12 h-12 bg-[#83e160]/10 group-hover:bg-[#83e160] rounded-full flex items-center justify-center transition-colors border border-[#83e160]/30 group-hover:border-[#83e160]">
+                  {isGeneratingPdf ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-[#83e160] rounded-full animate-spin"></div>
+                  ) : (
+                    <svg className="w-6 h-6 fill-[#83e160] group-hover:fill-white transition-colors" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <g strokeWidth="0"></g>
+                      <g strokeLinecap="round" strokeLinejoin="round"></g>
+                      <g>
+                        <path d="M19.2,6.67,12.34,0H2.74A2.77,2.77,0,0,0,.81.78,2.62,2.62,0,0,0,0,2.67V21.33a2.62,2.62,0,0,0,.81,1.89A2.77,2.77,0,0,0,2.74,24H16.46a2.77,2.77,0,0,0,1.93-.78,2.62,2.62,0,0,0,.81-1.89V20H24V9.33H19.2ZM11.66,2.16,17,7.33H11.66Zm11,8.51v8H6.17v-8Z"></path>
+                        <path d="M11.76,13.69a1.71,1.71,0,0,1-.12.71,1.58,1.58,0,0,1-.43.59,2.41,2.41,0,0,1-1.56.46h-.5v1.89H8V12H9.76a2.22,2.22,0,0,1,1.5.42,1.67,1.67,0,0,1,.38.58A1.6,1.6,0,0,1,11.76,13.69Zm-2.64.85h.39a1.29,1.29,0,0,0,.79-.21.9.9,0,0,0,.21-.27.88.88,0,0,0,.07-.32.89.89,0,0,0-.05-.32,1,1,0,0,0-.17-.27A1,1,0,0,0,9.67,13H9.15v1.57Z"></path>
+                        <path d="M17.33,14.65a2.7,2.7,0,0,1-.16,1.09,2.64,2.64,0,0,1-.61.93,3.13,3.13,0,0,1-2.22.7H12.77V12H14.5a3,3,0,0,1,2.09.7,2.47,2.47,0,0,1,.74,1.92Zm-1.21,0c0-1.14-.52-1.7-1.56-1.7h-.64v3.46h.5a1.53,1.53,0,0,0,1.7-1.76Z"></path>
+                        <path d="M19.6,17.37H18.45V12h3.16V13h-2v1.38h1.87v.94H19.6Z"></path>
+                      </g>
+                    </svg>
+                  )}
+                </div>
+                <span className={`text-[9px] font-bold uppercase tracking-tighter ${isGeneratingPdf ? 'text-gray-400' : 'text-[#83e160]'}`}>
+                  {isGeneratingPdf ? 'Pensando...' : 'Guardar'}
+                </span>
+              </button>
+
             </div>
           </div>
         ) : (
