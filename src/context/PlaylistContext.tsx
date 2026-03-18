@@ -1,3 +1,4 @@
+// src/context/PlaylistContext.tsx
 "use client";
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -17,7 +18,7 @@ interface PlaylistContextType {
   isInPlaylist: (id: string) => boolean;
   clearPlaylist: () => void;
   undoClear: () => void;
-  clearBackup: () => void; // NUEVO: Para limpiar la caché de deshacer
+  clearBackup: () => void; 
   canUndo: boolean;
   isImporting: boolean;
 }
@@ -29,6 +30,10 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
   const [lastBackup, setLastBackup] = useState<Song[] | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const isImportedRef = useRef(false);
+  
+  // CANDADO PARA EVITAR BUCLES DE PETICIONES AL SERVIDOR
+  const isFetchingBulk = useRef(false); 
+  
   const router = useRouter();
   const pathname = usePathname();
 
@@ -46,7 +51,7 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
           const parts = item.split(':');
           return { 
             id: parts[0], 
-            key: parts[1] || 'C', // Siempre guardamos una nota, no 'orig'
+            key: parts[1] || 'orig', 
             name: "Cargando..." 
           };
         }).filter((s: Song) => s.id);
@@ -75,10 +80,21 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const fetchNames = async () => {
-      const missing = playlist.filter((s: Song) => s.name === "Cargando...");
-      if (missing.length === 0) return;
+      // 1. AHORA DETECTAMOS CUALQUIER ANOMALÍA (!s.key, "", "-", "orig")
+      const missing = playlist.filter((s: Song) => 
+        s.name === "Cargando..." || 
+        !s.key || 
+        s.key === "orig" || 
+        s.key === "-" || 
+        s.key === ""
+      );
+      
+      // Si no hay nada que buscar, o si ya estamos buscando, detenemos la función
+      if (missing.length === 0 || isFetchingBulk.current) return;
 
+      isFetchingBulk.current = true; // Cerramos el candado
       const ids = missing.map((s: Song) => s.id).join(',');
+      
       try {
         const res = await fetch(`/api/songs/bulk?ids=${ids}`);
         if (!res.ok) throw new Error("Error en API");
@@ -88,18 +104,30 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
           setPlaylist((current: Song[]) => 
             current.map((song: Song) => {
               const found = data.find((d: any) => d.id === song.id);
-              return (found && song.name === "Cargando...") ? { ...song, name: found.name } : song;
+              if (found) {
+                const newName = song.name === "Cargando..." ? found.name : song.name;
+                
+                // 2. CORREGIMOS LA NOTA SI ESTABA VACÍA O ERA INVÁLIDA
+                const isInvalidKey = !song.key || song.key === "orig" || song.key === "-" || song.key === "";
+                const newKey = isInvalidKey ? (found.originalKey || 'C') : song.key;
+                
+                return { ...song, name: newName, key: newKey };
+              }
+              return song;
             })
           );
         }
       } catch (err) {
-        console.error("Error nombres:", err);
+        console.error("Error al actualizar playlist en masa:", err);
+      } finally {
+        isFetchingBulk.current = false; // Abrimos el candado
       }
     };
 
+    // Le damos 500ms al usuario para que termine de dar clics antes de consultar al servidor
     const timer = setTimeout(fetchNames, 500);
     return () => clearTimeout(timer);
-  }, [playlist.length]);
+  }, [playlist]);
 
   const addToPlaylist = (song: Song) => {
     setPlaylist((prev: Song[]) => {
@@ -155,7 +183,6 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // NUEVA FUNCIÓN: Si cierras el modal vacío, se pierde la opción de deshacer
   const clearBackup = () => {
     setLastBackup(null);
   };

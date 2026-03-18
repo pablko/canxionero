@@ -1,5 +1,6 @@
+// app/api/songs/bulk/route.ts
 import { NextResponse } from 'next/server';
-import { getSongsList } from '@/src/lib/googleDrive';
+import { getSongContent } from '@/src/lib/googleDrive';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -9,21 +10,28 @@ export async function GET(request: Request) {
 
   try {
     const ids = idsParam.split(',');
-    const allSongs = await getSongsList();
-    
-    if (!allSongs) return NextResponse.json([]);
 
-    const filtered = allSongs
-      .filter(s => s.id && ids.includes(s.id))
-      .map(s => ({ 
-        id: s.id as string, 
-        name: s.name || "Sin título" 
-      }));
+    // --- MAGIA DEL BACKEND ULTRA-RÁPIDO ---
+    // Ya no buscamos en todo Drive, vamos directo a los documentos que necesitamos
+    const songsWithKeys = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const content = await getSongContent(id);
+          return { 
+            id, 
+            name: content.title || "Sin título",
+            originalKey: content.originalKey || 'C'
+          };
+        } catch (error) {
+          // Si falla una, no rompemos el resto
+          return { id, name: "Canción no disponible", originalKey: 'C' };
+        }
+      })
+    );
 
-    return NextResponse.json(filtered);
+    return NextResponse.json(songsWithKeys);
   } catch (error) {
     console.error("Error en API Bulk:", error);
-    // Devolvemos array vacío pero con status 500 para que el cliente sepa que falló
     return NextResponse.json([], { status: 500 });
   }
 }

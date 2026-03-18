@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from 'react';
-import { CHROMATIC_SCALE, transposeFullChord, getSemitonesBetween, detectScale } from '../../../src/lib/musicUtils';
+import { CHROMATIC_SCALE, transposeFullChord, getSemitonesBetween } from '../../../src/lib/musicUtils';
 import { useParams } from 'next/navigation';
 import { usePlaylist } from '@/src/context/PlaylistContext';
 
@@ -41,25 +41,8 @@ export default function SongPage() {
           setDocTitle(data.title);
         }
         
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = data.html;
-        const plainText = tempDiv.textContent || tempDiv.innerText;
-
-        let detectedKey = "C";
-        const match = plainText.match(/Nota:\s*([A-G][#b]?)/i);
-        
-        if (match) {
-          detectedKey = match[1].toUpperCase();
-        } else {
-          const chordSpans = tempDiv.querySelectorAll('[data-chord="true"]');
-          const chordsInSong: string[] = [];
-          chordSpans.forEach(span => {
-            const content = span.textContent || "";
-            const found = content.match(/([A-G][#b]?m?)(?:\/([A-G][#b]?))?/g);
-            if (found) chordsInSong.push(...found);
-          });
-          detectedKey = detectScale(chordsInSong);
-        }
+        // ¡FRONTEND LIMPIO! Tomamos la tonalidad mágica que nos mandó el backend
+        const detectedKey = data.originalKey || "C";
 
         setOriginalKey(detectedKey);
         
@@ -76,18 +59,20 @@ export default function SongPage() {
   }, [songId]);
 
   useEffect(() => {
+    if (loading) return;
+
     if (playlist.length > 0 && songId && originalKey) {
       const savedInPlaylist = playlist.find(s => s.id === songId);
       if (savedInPlaylist) {
-        if (savedInPlaylist.key && savedInPlaylist.key !== 'orig') {
+        if (savedInPlaylist.key && savedInPlaylist.key !== 'orig' && savedInPlaylist.key !== '-') {
           setCurrentKey(savedInPlaylist.key);
           hasAppliedInitialKey.current = true;
-        } else if (!savedInPlaylist.key) {
+        } else {
           updateSongKey(songId, originalKey);
         }
       }
     }
-  }, [playlist, songId, originalKey, updateSongKey]);
+  }, [playlist, songId, originalKey, updateSongKey, loading]);
 
   useEffect(() => {
     if (!songRef.current || !songHtml) return;
@@ -199,7 +184,6 @@ export default function SongPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       
-      // FORMATEO DEL NOMBRE DEL ARCHIVO: Titulo-separado_Artista
       const safeTitle = title.replace(/[^a-zA-Z0-9 áéíóúÁÉÍÓÚñÑ]/g, "").trim().replace(/\s+/g, "-");
       const safeArtist = artist.replace(/[^a-zA-Z0-9 áéíóúÁÉÍÓÚñÑ]/g, "").trim().replace(/\s+/g, "-");
       

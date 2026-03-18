@@ -59,7 +59,7 @@ export async function POST(req: Request) {
         } else {
           const splitText = doc.splitTextToSize(line.text, colWidth);
           sectionHeight += splitText.length * doc.getLineHeight();
-          const isHeader = /^(VERSO|CORO|PUENTE|INTERLUDIO|PRE-CORO|PRE CORO|INTRO|OUTRO|FINAL|INSTRUMENTAL|CODA)(\s.*)?$/i.test(line.text.trim());
+          const isHeader = /^(VERSO|CORO|PUENTE|INTERLUDIO|REFRAIN|PRE-CORO|PRE CORO|INTRO|OUTRO|FINAL|INSTRUMENTAL|CODA)(\s.*)?$/i.test(line.text.trim());
           if (isHeader) sectionHeight += 6; // Sumamos el espacio que agregaremos luego
         }
       });
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
           currentY += 8;
         } else {
           
-          const isHeader = /^(VERSO|CORO|PUENTE|INTERLUDIO|PRE-CORO|PRE CORO|INTRO|OUTRO|FINAL|INSTRUMENTAL|CODA)(\s.*)?$/i.test(line.text.trim());
+          const isHeader = /^(VERSO|CORO|PUENTE|INTERLUDIO|REFRAIN|PRE-CORO|PRE CORO|INTRO|OUTRO|FINAL|INSTRUMENTAL|CODA)(\s.*)?$/i.test(line.text.trim());
           
           if (line.isChord) {
             doc.setFont("helvetica", "bold");

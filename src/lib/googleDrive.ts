@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { detectScale } from './musicUtils'; // <-- IMPORTAMOS EL DETECTOR
 
 const getPrivateKey = () => {
   const key = process.env.GOOGLE_PRIVATE_KEY;
@@ -45,14 +46,23 @@ export async function getSongContent(documentId: string) {
     const res = await docs.documents.get({ documentId });
     let htmlContent = "";
     let lineCounter = 0;
-    
     let isInsideSection = false;
+    
+    // --- VARIABLES PARA EL CEREBRO MUSICAL ---
+    let detectedNote: string | null = null;
+    const chordsInSong: string[] = [];
 
     res.data.body?.content?.forEach((element) => {
       if (element.paragraph) {
         const paragraphText = element.paragraph.elements
           ?.map(el => el.textRun?.content || "")
           .join("") || "";
+
+        // 1. Buscamos si el usuario escribió la nota explícitamente ("Nota: C#")
+        const noteMatch = paragraphText.match(/Nota:\s*([A-G][#b]?)/i);
+        if (noteMatch) {
+          detectedNote = noteMatch[1].toUpperCase();
+        }
 
         const isEmptyParagraph = paragraphText.trim() === "";
 
@@ -61,7 +71,7 @@ export async function getSongContent(documentId: string) {
         }
 
         if (lineCounter > 2) {
-          const isSectionHeader = /^(VERSO|CORO|PUENTE|INTERLUDIO|PRE-CORO|PRE CORO|INTRO|OUTRO|FINAL|INSTRUMENTAL|CODA)(\s.*)?$/i.test(paragraphText.trim());
+          const isSectionHeader = /^(VERSO|CORO|PUENTE|INTERLUDIO|REFRAIN|PRE-CORO|PRE CORO|INTRO|OUTRO|FINAL|INSTRUMENTAL|CODA)(\s.*)?$/i.test(paragraphText.trim());
           
           if (isSectionHeader) {
             if (isInsideSection) {
@@ -109,6 +119,10 @@ export async function getSongContent(documentId: string) {
 
               if (isChordColor) {
                 htmlContent += `<span data-chord="true" style="font-weight: 700; color: rgb(255, 119, 0); cursor: pointer; ${headerStyle}">${escapedText}</span>`;
+                
+                // 2. Guardamos silenciosamente todos los acordes que encontremos
+                const found = escapedText.match(/([A-G][#b]?m?)(?:\/([A-G][#b]?))?/g);
+                if (found) chordsInSong.push(...found);
               } else {
                 htmlContent += `<span style="font-weight: ${finalWeight}; ${colorStyle} ${underlineStyle} ${headerStyle}">${escapedText}</span>`;
               }
@@ -122,7 +136,14 @@ export async function getSongContent(documentId: string) {
       htmlContent += "</div>";
     }
 
-    return { title: res.data.title, html: htmlContent };
+    // 3. Resolvemos la tonalidad definitiva (Prioridad a lo escrito, respaldo algorítmico)
+    let finalOriginalKey = detectedNote;
+    if (!finalOriginalKey) {
+      finalOriginalKey = detectScale(chordsInSong);
+    }
+
+    // Devolvemos el paquete con la llave original incluida
+    return { title: res.data.title, html: htmlContent, originalKey: finalOriginalKey };
   } catch (error) {
     console.error("Error al obtener contenido de Google Docs:", error);
     throw new Error("No se pudo cargar la canción.");
