@@ -135,10 +135,7 @@ export async function getSongContent(documentId: string) {
       htmlContent += "</div>";
     }
 
-    let finalOriginalKey = detectedNote;
-    if (!finalOriginalKey) {
-      finalOriginalKey = detectScale(chordsInSong);
-    }
+    const finalOriginalKey: string = detectedNote || detectScale(chordsInSong);
 
     return { title: res.data.title, html: htmlContent, originalKey: finalOriginalKey };
   } catch (error) {
