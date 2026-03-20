@@ -56,16 +56,9 @@ export async function getSongContent(documentId: string) {
         const paragraphText = element.paragraph.elements
           ?.map(el => el.textRun?.content || "")
           .join("") || "";
-
-        // 1. Buscamos si el usuario escribió la nota explícitamente ("Nota: C#")
         const noteMatch = paragraphText.match(/Nota:\s*([A-G][#b]?)/i);
         if (noteMatch) {
           detectedNote = noteMatch[1].toUpperCase();
-          
-          // 🛑 MAGIA AQUÍ: 
-          // Como ya guardamos la nota en la variable 'detectedNote', 
-          // hacemos un 'return' para saltarnos este párrafo. 
-          // De esta forma, jamás se añade al 'htmlContent' y desaparece de la app y los PDFs.
           return; 
         }
 
@@ -76,7 +69,7 @@ export async function getSongContent(documentId: string) {
         }
 
         if (lineCounter > 2) {
-          const isSectionHeader = /^(VERSO|CORO|PUENTE|INTERLUDIO|PRE-CORO|PRE CORO|INTRO|OUTRO|FINAL|INSTRUMENTAL|CODA)(\s.*)?$/i.test(paragraphText.trim());
+          const isSectionHeader = /^(VERSO|CORO|PUENTE|REFRAIN|INTERLUDIO|PRE-CORO|PRE CORO|INTRO|OUTRO|FINAL|INSTRUMENTAL|CODA)(\s.*)?$/i.test(paragraphText.trim());
           
           if (isSectionHeader) {
             if (isInsideSection) {
@@ -132,6 +125,8 @@ export async function getSongContent(documentId: string) {
               }
             }
           });
+        } else if (lineCounter >= 2) {
+          htmlContent += `<span style="display: block; max-height: 0.5rem;">\n</span>`;
         }
       }
     });
