@@ -4,6 +4,13 @@ import { PlaylistProvider } from '@/src/context/PlaylistContext';
 import FloatingPlaylist from '@/src/components/FloatingPlaylist';
 import Navbar from '@/src/components/Navbar'; 
 import { Suspense } from 'react'; 
+import { Montserrat } from 'next/font/google';
+
+const montserrat = Montserrat({ 
+  subsets: ['latin'],
+  weight: ['400', '700', '900'],
+  variable: '--font-montserrat'
+});
 
 export const metadata = {
   title: 'Canxionero',
@@ -16,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
+    <html lang="es" className={montserrat.variable}>
       <body className="font-montserrat bg-gray-100 text-gray-900 min-h-screen">
         <PlaylistProvider>
           {/* 2. Envuelve el Navbar con Suspense */}

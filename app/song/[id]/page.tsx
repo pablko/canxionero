@@ -38,6 +38,17 @@ export default function SongPage() {
         
         if (data.title) {
           setDocTitle(data.title);
+          
+          let titleStr = "Canción";
+          let artistStr = "Artista";
+          if (data.title.includes('-')) {
+            const parts = data.title.split('-');
+            titleStr = parts[0].trim();
+            artistStr = parts.slice(1).join('-').trim();
+          } else {
+            titleStr = data.title.trim();
+          }
+          document.title = `${titleStr} de ${artistStr} - Canxionero`;
         }
         
         const detectedKey = data.originalKey || "C";
@@ -260,7 +271,7 @@ export default function SongPage() {
             <span className="text-[10px] tracking-tighter uppercase font-bold text-[#F26419] animate-pulse">Pdf...</span>
           ) : (
             <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M19 8H5V3H19V8ZM16 5H8V6H16V5ZM19 9H5C3.34315 9 2 10.3431 2 12V17H6V21H18V17H22V12C22 10.3431 20.6569 9 19 9ZM16 19H8V14H16V19ZM19 13C18.4477 13 18 12.5523 18 12C18 11.4477 18.4477 11 19 11C19.5523 11 20 11.4477 20 12C20 12.5523 19.5523 13 19 13Z" />
+              <g><path d="M19.2,6.67,12.34,0H2.74A2.77,2.77,0,0,0,.81.78,2.62,2.62,0,0,0,0,2.67V21.33a2.62,2.62,0,0,0,.81,1.89A2.77,2.77,0,0,0,2.74,24H16.46a2.77,2.77,0,0,0,1.93-.78,2.62,2.62,0,0,0,.81-1.89V20H24V9.33H19.2ZM11.66,2.16,17,7.33H11.66Zm11,8.51v8H6.17v-8Z"></path><path d="M11.76,13.69a1.71,1.71,0,0,1-.12.71,1.58,1.58,0,0,1-.43.59,2.41,2.41,0,0,1-1.56.46h-.5v1.89H8V12H9.76a2.22,2.22,0,0,1,1.5.42,1.67,1.67,0,0,1,.38.58A1.6,1.6,0,0,1,11.76,13.69Zm-2.64.85h.39a1.29,1.29,0,0,0,.79-.21.9.9,0,0,0,.21-.27.88.88,0,0,0,.07-.32.89.89,0,0,0-.05-.32,1,1,0,0,0-.17-.27A1,1,0,0,0,9.67,13H9.15v1.57Z"></path><path d="M17.33,14.65a2.7,2.7,0,0,1-.16,1.09,2.64,2.64,0,0,1-.61.93,3.13,3.13,0,0,1-2.22.7H12.77V12H14.5a3,3,0,0,1,2.09.7,2.47,2.47,0,0,1,.74,1.92Zm-1.21,0c0-1.14-.52-1.7-1.56-1.7h-.64v3.46h.5a1.53,1.53,0,0,0,1.7-1.76Z"></path><path d="M19.6,17.37H18.45V12h3.16V13h-2v1.38h1.87v.94H19.6Z"></path></g>
             </svg>
           )}
         </button>
