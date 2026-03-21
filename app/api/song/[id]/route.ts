@@ -9,7 +9,7 @@ export async function GET(
     const { id } = await params;
 
     if (!id) {
-      return NextResponse.json({ error: "ID no proporcionado" }, { status: 400 });
+      return NextResponse.json({ error: "ID no proporcionado" }, { status: 500 });
     }
 
     // 1. Obtenemos el contenido

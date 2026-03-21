@@ -22,8 +22,7 @@ export const docs = google.docs({ version: 'v1', auth });
 export async function getSongsList(searchTerm?: string) {
   try {
     const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
-    let query = `'${folderId}' in parents and mimeType = 'application/vnd.google-apps.document' and trashed = false`;
-    const hasSearch = searchTerm && searchTerm.trim() !== "";
+let query = `'${folderId}' in parents and mimeType = 'application/vnd.google-apps.document' and name != '_Plantilla-Canxionero' and trashed = false`;    const hasSearch = searchTerm && searchTerm.trim() !== "";
     if (hasSearch) {
       const escapedTerm = searchTerm.replace(/'/g, "\\'");
       query += ` and (name contains '${escapedTerm}' or fullText contains '${escapedTerm}')`;
@@ -93,13 +92,13 @@ export async function getSongContent(documentId: string) {
               if (lineCounter === 1) {
                 headerStyle = "font-size: 26px; font-weight: 800; line-height: 1.2; display: block; column-span: all; -webkit-column-span: all; margin-bottom: 4px;";
               } else if (lineCounter === 2) {
-                headerStyle = "font-size: 16px; font-weight: 400; line-height: 1.2; color: #666; display: block; column-span: all; -webkit-column-span: all; margin-bottom: 24px;";
+                headerStyle = "font-size: 16px; font-weight: 500; line-height: 1.2; color: #666; display: block; column-span: all; -webkit-column-span: all; margin-bottom: 24px;";
               }
 
               const rgb = style?.foregroundColor?.color?.rgbColor;
               const isChordColor = rgb && rgb.red === 1 && rgb.green && rgb.green > 0.45 && rgb.green < 0.48;
 
-              let finalWeight = 400;
+              let finalWeight = 500;
               if (style?.weightedFontFamily?.weight === 800) finalWeight = 900;
               else if (style?.bold === true) finalWeight = 700;
 

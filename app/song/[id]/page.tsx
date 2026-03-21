@@ -133,7 +133,7 @@ export default function SongPage() {
         const lines: any[] = [];
         let currentLineText = "";
         let currentLineIsChord = false;
-        let currentLineWeight = 400;
+        let currentLineWeight = 500;
 
         spans.forEach(span => {
           if (span.style.fontSize === '26px' || span.style.fontSize === '16px' || span.style.columnSpan === 'all') {
@@ -143,7 +143,7 @@ export default function SongPage() {
           const text = span.textContent || "";
           if (!text) return;
 
-          const spanWeight = parseInt(span.style.fontWeight) || 400;
+          const spanWeight = parseInt(span.style.fontWeight) || 500;
           const isChord = span.getAttribute('data-chord') === 'true';
 
           const parts = text.split('\n');
@@ -165,7 +165,7 @@ export default function SongPage() {
               });
               currentLineText = "";
               currentLineIsChord = false;
-              currentLineWeight = 400;
+              currentLineWeight = 500;
             }
           }
         });

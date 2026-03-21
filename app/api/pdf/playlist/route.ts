@@ -95,7 +95,7 @@ export async function POST(req: Request) {
             if (line.isChord) {
               doc.setFont("helvetica", "bold");
               doc.setTextColor(255, 119, 0); 
-            } else if (line.weight > 400 || isHeader) {
+            } else if (line.weight > 500 || isHeader) {
               doc.setFont("helvetica", "bold");
               doc.setTextColor(47, 72, 88); 
             } else {

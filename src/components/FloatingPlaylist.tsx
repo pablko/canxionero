@@ -144,7 +144,7 @@ export default function FloatingPlaylist() {
             const lines: any[] = [];
             let currentLineText = "";
             let currentLineIsChord = false;
-            let currentLineWeight = 400;
+            let currentLineWeight = 500;
 
             spans.forEach(span => {
               if (span.style.fontSize === '26px' || span.style.fontSize === '16px' || span.style.columnSpan === 'all') {
@@ -154,7 +154,7 @@ export default function FloatingPlaylist() {
               const text = span.textContent || "";
               if (!text) return;
 
-              const spanWeight = parseInt(span.style.fontWeight) || 400;
+              const spanWeight = parseInt(span.style.fontWeight) || 500;
               const isChord = span.getAttribute('data-chord') === 'true';
 
               const parts = text.split('\n');
@@ -177,7 +177,7 @@ export default function FloatingPlaylist() {
                   });
                   currentLineText = "";
                   currentLineIsChord = false;
-                  currentLineWeight = 400;
+                  currentLineWeight = 500;
                 }
               }
             });
@@ -257,7 +257,7 @@ export default function FloatingPlaylist() {
                           <Draggable key={song.id} draggableId={song.id} index={index}>
                             {(provided) => (
                               <div ref={provided.innerRef} {...provided.draggableProps} className="flex items-center gap-2">
-                                <div {...provided.dragHandleProps} className="text-gray-400 p-1 cursor-grab">
+                                <div {...provided.dragHandleProps} className="text-gray-500 p-1 cursor-grab">
                                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8h16M4 16h16" /></svg>
                                 </div>
                                 <Link href={`/song/${song.id}`} onClick={handleCloseModal} className="flex-1 p-3 bg-white border border-gray-200 rounded-xl text-[11px] font-bold text-[#2F4858] flex justify-between items-center shadow-sm hover:border-[#55DDE0] transition-colors">
@@ -279,7 +279,7 @@ export default function FloatingPlaylist() {
                   </Droppable>
                 </DragDropContext>
               ) : (
-                <p className="text-center text-gray-400 text-xs italic">Lista vacía...</p>
+                <p className="text-center text-gray-500 text-xs italic">Lista vacía...</p>
               )}
             </div>
 
@@ -349,7 +349,7 @@ export default function FloatingPlaylist() {
                     </svg>
                   )}
                 </div>
-                <span className={`text-[9px] font-bold uppercase tracking-tighter ${isGeneratingPdf ? 'text-gray-400' : 'text-[#83e160]'}`}>
+                <span className={`text-[9px] font-bold uppercase tracking-tighter ${isGeneratingPdf ? 'text-gray-500' : 'text-[#83e160]'}`}>
                   {isGeneratingPdf ? 'Pensando...' : 'Guardar'}
                 </span>
               </button>
