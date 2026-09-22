@@ -1,22 +1,22 @@
-export const CHROMATIC_SCALE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+export const CHROMATIC_SCALE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'Bb', 'B'];
 
 export const MAJOR_SCALES_MAP: Record<string, string[]> = {
   'C':  ['C', 'Dm', 'Em', 'F', 'G', 'Am'],
-  'C#': ['C#', 'D#m', 'Fm', 'F#', 'G#', 'A#m'],
-  'Db': ['C#', 'D#m', 'Fm', 'F#', 'G#', 'A#m'], 
+  'C#': ['C#', 'D#m', 'Fm', 'F#', 'G#', 'Bbm'],
+  'Db': ['C#', 'D#m', 'Fm', 'F#', 'G#', 'Bbm'],
   'D':  ['D', 'Em', 'F#m', 'G', 'A', 'Bm'],
-  'D#': ['D#', 'Fm', 'Gm', 'G#', 'A#', 'Cm'],
-  'Eb': ['D#', 'Fm', 'Gm', 'G#', 'A#', 'Cm'], 
+  'D#': ['D#', 'Fm', 'Gm', 'G#', 'Bb', 'Cm'],
+  'Eb': ['D#', 'Fm', 'Gm', 'G#', 'Bb', 'Cm'],
   'E':  ['E', 'F#m', 'G#m', 'A', 'B', 'C#m'],
   'F':  ['F', 'Gm', 'Am', 'Bb', 'C', 'Dm'],
-  'F#': ['F#', 'G#m', 'A#m', 'B', 'C#', 'D#m'],
-  'Gb': ['F#', 'G#m', 'A#m', 'B', 'C#', 'D#m'], 
+  'F#': ['F#', 'G#m', 'Bbm', 'B', 'C#', 'D#m'],
+  'Gb': ['F#', 'G#m', 'Bbm', 'B', 'C#', 'D#m'],
   'G':  ['G', 'Am', 'Bm', 'C', 'D', 'Em'],
-  'G#': ['G#', 'A#m', 'Cm', 'C#', 'D#', 'Fm'],
-  'Ab': ['G#', 'A#m', 'Cm', 'C#', 'D#', 'Fm'], 
+  'G#': ['G#', 'Bbm', 'Cm', 'C#', 'D#', 'Fm'],
+  'Ab': ['G#', 'Bbm', 'Cm', 'C#', 'D#', 'Fm'],
   'A':  ['A', 'Bm', 'C#m', 'D', 'E', 'F#m'],
-  'A#': ['A#', 'Cm', 'Dm', 'D#', 'F', 'Gm'],
-  'Bb': ['A#', 'Cm', 'Dm', 'D#', 'F', 'Gm'], 
+  'A#': ['Bb', 'Cm', 'Dm', 'D#', 'F', 'Gm'],
+  'Bb': ['Bb', 'Cm', 'Dm', 'D#', 'F', 'Gm'],
   'B':  ['B', 'C#m', 'D#m', 'E', 'F#', 'G#m'],
 };
 
@@ -27,7 +27,7 @@ export function normalizeNote(note: string): string {
     'Eb': 'D#',
     'Gb': 'F#',
     'Ab': 'G#',
-    'Bb': 'A#'
+    'A#': 'Bb'
   };
   return flatToSharp[note] || note;
 }
