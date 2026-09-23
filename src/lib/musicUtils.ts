@@ -22,6 +22,10 @@ export const MAJOR_SCALES_MAP: Record<string, string[]> = {
 
 // Exportada para que sea útil en otros archivos si es necesario
 export function normalizeNote(note: string): string {
+  const normalizedNote = note.trim();
+  const canonicalNote = normalizedNote.length > 0
+    ? normalizedNote[0].toUpperCase() + normalizedNote.slice(1).toLowerCase()
+    : normalizedNote;
   const flatToSharp: Record<string, string> = {
     'Db': 'C#',
     'Eb': 'D#',
@@ -29,13 +33,12 @@ export function normalizeNote(note: string): string {
     'Ab': 'G#',
     'A#': 'Bb'
   };
-  return flatToSharp[note] || note;
+  return flatToSharp[canonicalNote] || canonicalNote;
 }
 
 export function getSemitonesBetween(from: string, to: string): number {
-  // También normalizamos aquí por si comparas "Bb" con "B"
-  const fromNormalized = normalizeNote(from.toUpperCase());
-  const toNormalized = normalizeNote(to.toUpperCase());
+  const fromNormalized = normalizeNote(from);
+  const toNormalized = normalizeNote(to);
   
   const fromIdx = CHROMATIC_SCALE.indexOf(fromNormalized);
   const toIdx = CHROMATIC_SCALE.indexOf(toNormalized);

@@ -51,7 +51,9 @@ export default function SongPage() {
           document.title = `${titleStr} de ${artistStr} - Canxionero`;
         }
         
-        const detectedKey = data.originalKey || "C";
+        const detectedKey = data.originalKey?.toUpperCase() === "BB"
+          ? "Bb"
+          : data.originalKey || "C";
 
         setOriginalKey(detectedKey);
         
